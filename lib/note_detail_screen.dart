@@ -3,7 +3,18 @@ import 'package:share_plus/share_plus.dart';
 import 'note_model.dart';
 import 'database_helper.dart';
 
+/// NoteDetailScreen - Detailed view and editing interface for a single voice note
+/// Features:
+///   - Display full note transcript with title, tags, and metadata
+///   - Real-time sharing of note content via native share dialog
+///   - Like/unlike toggle for marking favorites
+///   - Edit note title, transcript, and tags inline
+///   - Delete note with confirmation dialog
+///   - Toggle between view and edit modes
+///   - Back button that respects edit state (prevents accidental loss)
 class NoteDetailScreen extends StatefulWidget {
+  /// The Note object passed from HomeScreen or other navigation
+  /// Contains all note data: ID, title, content, tags, like status, etc.
   final Note note;
 
   const NoteDetailScreen({super.key, required this.note});
@@ -12,22 +23,51 @@ class NoteDetailScreen extends StatefulWidget {
   State<NoteDetailScreen> createState() => _NoteDetailScreenState();
 }
 
+/// State class for NoteDetailScreen
+/// Manages:
+///   - View vs Edit mode toggling
+///   - Text field controllers for title, content, and tags
+///   - Like/unlike functionality with database persistence
+///   - Note sharing via native share dialogs
+///   - Note deletion with confirmation
+///   - Saving edited content back to database
 class _NoteDetailScreenState extends State<NoteDetailScreen> {
+  // ====== STATE VARIABLES ======
+  /// Current Note object being displayed/edited
+  /// Updated when note data changes (like, edit, delete)
   late Note _note;
+  
+  /// Controller for the note title TextField
+  /// Pre-populated with current title on init
   late TextEditingController _titleController;
+  
+  /// Controller for the transcript/content TextField
+  /// Pre-populated with current content on init
   late TextEditingController _contentController;
+  
+  /// Controller for the tags TextField
+  /// Pre-populated with comma-separated tags on init
   late TextEditingController _tagsController;
+  
+  /// Toggle flag for view vs edit mode
+  /// true = edit mode (show editable fields, hide share/like buttons)
+  /// false = view mode (show static display, show action buttons)
   bool _isEditing = false;
 
   @override
   void initState() {
     super.initState();
+    // Initialize note from widget parameter
     _note = widget.note;
+    // Create text controllers pre-populated with current note data
     _titleController = TextEditingController(text: _note.title);
     _contentController = TextEditingController(text: _note.content);
     _tagsController = TextEditingController(text: _note.tags);
   }
 
+  /// ====== CLEANUP ======
+  /// Dispose of all TextEditingControllers to prevent memory leaks
+  /// Called when widget is removed from widget tree
   @override
   void dispose() {
     _titleController.dispose();
@@ -36,6 +76,18 @@ class _NoteDetailScreenState extends State<NoteDetailScreen> {
     super.dispose();
   }
 
+  /// ====== SHARING FUNCTIONALITY ======
+  /// Share the complete note transcript via native share dialog
+  /// Flow:
+  ///   1. Format note data (title, date, tags, content) into readable text
+  ///   2. Call Share.share() from share_plus plugin
+  ///   3. Shows OS-native share menu (email, messaging, notes, etc.)
+  ///   4. User selects destination app to share to
+  /// 
+  /// Error Handling:
+  ///   - Catches exceptions if share fails
+  ///   - Shows red SnackBar with error message
+  ///   - Checks mounted flag before showing UI (prevents crashes on unmount)
   void _shareTranscript() async {
     try {
       final text = '''
@@ -57,6 +109,10 @@ ${_note.content}
     }
   }
 
+  /// ====== LIKE/FAVORITE TOGGLE ======
+  /// Toggle the like/favorite status of current note
+  /// Updates database and UI with flipped like status
+  /// Shows colored SnackBar: green for favorite, orange for unfavorite
   void _toggleLike() async {
     try {
       await DatabaseHelper().updateNoteLike(_note.id, !_note.isLiked);
@@ -91,6 +147,9 @@ ${_note.content}
 
 
 
+  /// ====== DELETE NOTE WITH CONFIRMATION ======
+  /// Show confirmation dialog before permanently deleting note
+  /// Prevents accidental deletion by requiring explicit confirmation
   void _deleteNote() {
     showDialog(
       context: context,
@@ -131,6 +190,9 @@ ${_note.content}
     );
   }
 
+  /// ====== SAVE EDITED CHANGES ======
+  /// Persist all edits (title, content, tags) back to database
+  /// Updates database, refreshes UI, and returns to view mode
   void _saveChanges() async {
     try {
       await DatabaseHelper().updateNote(
@@ -170,6 +232,9 @@ ${_note.content}
     }
   }
 
+  /// ====== UI BUILD METHOD ======
+  /// Main build method creating detail screen with view/edit modes
+  /// WillPopScope handles back button to prevent accidental loss of edits
   @override
   Widget build(BuildContext context) {
     return WillPopScope(
@@ -182,12 +247,16 @@ ${_note.content}
         return true;
       },
       child: Scaffold(
+        // ====== APP BAR ======
+        // Dynamic title based on editing state
         appBar: AppBar(
           title: _isEditing
               ? const Text('Edit Note')
               : Text(_note.title.isNotEmpty ? _note.title : 'Untitled Note'),
           elevation: 0,
+          // Context-dependent action buttons
           actions: [
+            // View mode buttons: share, like, edit, delete
             if (!_isEditing)
               IconButton(
                 icon: const Icon(Icons.share),
@@ -213,6 +282,7 @@ ${_note.content}
                 color: const Color(0xFFF44336),
                 onPressed: _deleteNote,
               ),
+            // Edit mode buttons: cancel, save
             if (_isEditing)
               TextButton(
                 onPressed: () => setState(() => _isEditing = false),
@@ -225,11 +295,13 @@ ${_note.content}
               ),
           ],
         ),
+        // ====== BODY ======
         body: SingleChildScrollView(
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              // Header with date and tags
+              // ====== METADATA HEADER ======
+              // Shows date and tags in light teal background
               Container(
                 width: double.infinity,
                 padding: const EdgeInsets.all(16.0),
@@ -239,11 +311,13 @@ ${_note.content}
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
+                    // Date/time display
                     Text(
                       _note.dateTime,
                       style: const TextStyle(fontSize: 13, color: Colors.grey),
                     ),
                     const SizedBox(height: 8),
+                    // Tags as chips (view mode only)
                     if (!_isEditing && _note.tags.isNotEmpty)
                       Wrap(
                         spacing: 6,
@@ -259,12 +333,13 @@ ${_note.content}
                 ),
               ),
 
-              // Content
+              // ====== CONTENT SECTION ======
               Padding(
                 padding: const EdgeInsets.all(16.0),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
+                    // Edit mode: Title field
                     if (_isEditing)
                       Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
@@ -292,6 +367,7 @@ ${_note.content}
                           const SizedBox(height: 24),
                         ],
                       ),
+                    // Transcript header
                     const Text(
                       'Transcript',
                       style: TextStyle(
@@ -300,6 +376,7 @@ ${_note.content}
                       ),
                     ),
                     const SizedBox(height: 12),
+                    // Edit/View mode transcript
                     if (_isEditing)
                       TextField(
                         controller: _contentController,
@@ -330,6 +407,7 @@ ${_note.content}
                       ),
                     const SizedBox(height: 24),
                     
+                    // Edit mode: Tags field
                     if (_isEditing)
                       Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
@@ -357,7 +435,6 @@ ${_note.content}
                           const SizedBox(height: 24),
                         ],
                       ),
-                    
 
                   ],
                 ),
