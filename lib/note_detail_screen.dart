@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import 'package:just_audio/just_audio.dart';
+import 'package:share_plus/share_plus.dart';
 import 'note_model.dart';
 import 'database_helper.dart';
 
@@ -16,7 +18,11 @@ class _NoteDetailScreenState extends State<NoteDetailScreen> {
   late TextEditingController _titleController;
   late TextEditingController _contentController;
   late TextEditingController _tagsController;
+  late AudioPlayer _audioPlayer;
   bool _isEditing = false;
+  bool _isPlaying = false;
+  Duration _duration = Duration.zero;
+  Duration _position = Duration.zero;
 
   @override
   void initState() {
@@ -25,6 +31,32 @@ class _NoteDetailScreenState extends State<NoteDetailScreen> {
     _titleController = TextEditingController(text: _note.title);
     _contentController = TextEditingController(text: _note.content);
     _tagsController = TextEditingController(text: _note.tags);
+    _audioPlayer = AudioPlayer();
+    
+    // Listen to audio player events
+    _audioPlayer.playerStateStream.listen((playerState) {
+      if (mounted) {
+        setState(() {
+          _isPlaying = playerState.playing;
+        });
+      }
+    });
+
+    _audioPlayer.durationStream.listen((duration) {
+      if (mounted && duration != null) {
+        setState(() {
+          _duration = duration;
+        });
+      }
+    });
+
+    _audioPlayer.positionStream.listen((position) {
+      if (mounted) {
+        setState(() {
+          _position = position;
+        });
+      }
+    });
   }
 
   @override
@@ -32,7 +64,52 @@ class _NoteDetailScreenState extends State<NoteDetailScreen> {
     _titleController.dispose();
     _contentController.dispose();
     _tagsController.dispose();
+    _audioPlayer.dispose();
     super.dispose();
+  }
+
+  String _formatDuration(Duration duration) {
+    final minutes = duration.inMinutes;
+    final seconds = duration.inSeconds % 60;
+    return '$minutes:${seconds.toString().padLeft(2, '0')}';
+  }
+
+  void _playAudio() async {
+    try {
+      if (_isPlaying) {
+        await _audioPlayer.pause();
+      } else {
+        await _audioPlayer.setAsset(_note.recordingPath);
+        await _audioPlayer.play();
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Error playing audio: ${e.toString()}')),
+        );
+      }
+    }
+  }
+
+  void _shareTranscript() async {
+    try {
+      final text = '''
+Title: ${_note.title.isNotEmpty ? _note.title : 'Untitled Note'}
+Date: ${_note.dateTime}
+Tags: ${_note.tags.isNotEmpty ? _note.tags : 'No tags'}
+
+Transcript:
+${_note.content}
+      ''';
+      
+      await Share.share(text, subject: _note.title.isNotEmpty ? _note.title : 'Note Transcript');
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Error sharing: ${e.toString()}')),
+        );
+      }
+    }
   }
 
   void _toggleLike() async {
@@ -205,6 +282,12 @@ class _NoteDetailScreenState extends State<NoteDetailScreen> {
           actions: [
             if (!_isEditing)
               IconButton(
+                icon: const Icon(Icons.share),
+                onPressed: _shareTranscript,
+                tooltip: 'Share transcript',
+              ),
+            if (!_isEditing)
+              IconButton(
                 icon: Icon(
                   _note.isLiked ? Icons.favorite : Icons.favorite_border,
                   color: _note.isLiked ? const Color(0xFFCE93D8) : Colors.white,
@@ -367,7 +450,7 @@ class _NoteDetailScreenState extends State<NoteDetailScreen> {
                         ],
                       ),
                     
-                    // Recording Section
+                    // Recording Section with Playback
                     if (_note.recordingPath.isNotEmpty)
                       Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
@@ -388,24 +471,82 @@ class _NoteDetailScreenState extends State<NoteDetailScreen> {
                               borderRadius: BorderRadius.circular(8),
                               color: const Color(0xFFF3E5F5),
                             ),
-                            child: Row(
-                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                            child: Column(
                               children: [
-                                const Icon(Icons.audio_file, color: Color(0xFF9575CD)),
-                                const SizedBox(width: 12),
-                                Expanded(
-                                  child: Text(
-                                    _note.recordingPath.split('/').last,
-                                    overflow: TextOverflow.ellipsis,
-                                  ),
+                                Row(
+                                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                  children: [
+                                    const Icon(Icons.audio_file, color: Color(0xFF9575CD)),
+                                    const SizedBox(width: 12),
+                                    Expanded(
+                                      child: Text(
+                                        _note.recordingPath.split('/').last,
+                                        overflow: TextOverflow.ellipsis,
+                                        style: const TextStyle(fontSize: 14),
+                                      ),
+                                    ),
+                                    IconButton(
+                                      icon: const Icon(Icons.delete, color: Color(0xFFEF9A9A)),
+                                      onPressed: _deleteRecording,
+                                      tooltip: 'Delete recording',
+                                    ),
+                                  ],
                                 ),
-                                IconButton(
-                                  icon: const Icon(Icons.delete, color: Color(0xFFEF9A9A)),
-                                  onPressed: _deleteRecording,
+                                const SizedBox(height: 12),
+                                // Audio player controls
+                                Row(
+                                  children: [
+                                    IconButton(
+                                      icon: Icon(
+                                        _isPlaying ? Icons.pause_circle : Icons.play_circle,
+                                        color: const Color(0xFF9575CD),
+                                        size: 32,
+                                      ),
+                                      onPressed: _playAudio,
+                                    ),
+                                    Expanded(
+                                      child: Column(
+                                        children: [
+                                          SliderTheme(
+                                            data: SliderThemeData(
+                                              trackHeight: 4.0,
+                                              thumbShape: const RoundSliderThumbShape(enabledThumbRadius: 6),
+                                              activeTrackColor: const Color(0xFF9575CD),
+                                              inactiveTrackColor: const Color(0xFFE0BEE7),
+                                            ),
+                                            child: Slider(
+                                              value: _position.inSeconds.toDouble(),
+                                              max: _duration.inSeconds > 0 ? _duration.inSeconds.toDouble() : 1,
+                                              onChanged: (value) async {
+                                                await _audioPlayer.seek(Duration(seconds: value.toInt()));
+                                              },
+                                            ),
+                                          ),
+                                          Padding(
+                                            padding: const EdgeInsets.symmetric(horizontal: 12.0),
+                                            child: Row(
+                                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                              children: [
+                                                Text(
+                                                  _formatDuration(_position),
+                                                  style: const TextStyle(fontSize: 12),
+                                                ),
+                                                Text(
+                                                  _formatDuration(_duration),
+                                                  style: const TextStyle(fontSize: 12),
+                                                ),
+                                              ],
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                    ),
+                                  ],
                                 ),
                               ],
                             ),
                           ),
+                          const SizedBox(height: 24),
                         ],
                       ),
                   ],

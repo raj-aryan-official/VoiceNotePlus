@@ -69,6 +69,49 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
+  void _showEditTagsDialog(dynamic id, String currentTags) {
+    final controller = TextEditingController(text: currentTags);
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Edit Tags'),
+        content: TextField(
+          controller: controller,
+          maxLines: 3,
+          decoration: InputDecoration(
+            hintText: 'Enter tags separated by commas (e.g., work, important)',
+            border: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(8),
+            ),
+            filled: true,
+            fillColor: const Color(0xFFF3E5F5),
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Cancel'),
+          ),
+          TextButton(
+            onPressed: () {
+              DatabaseHelper().updateNote(id, tags: controller.text);
+              Navigator.pop(context);
+              _refreshNotes();
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(
+                  content: Text('Tags updated'),
+                  backgroundColor: Color(0xFFA5D6A7),
+                ),
+              );
+            },
+            child: const Text('Save'),
+          ),
+        ],
+      ),
+    );
+    controller.dispose();
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -282,6 +325,15 @@ class _HomeScreenState extends State<HomeScreen> {
                                 iconSize: 20,
                                 constraints: const BoxConstraints(),
                                 padding: EdgeInsets.zero,
+                              ),
+                              const SizedBox(width: 8),
+                              IconButton(
+                                icon: const Icon(Icons.label_outline, color: Color(0xFF9575CD)),
+                                onPressed: () => _showEditTagsDialog(note.id, note.tags),
+                                iconSize: 20,
+                                constraints: const BoxConstraints(),
+                                padding: EdgeInsets.zero,
+                                tooltip: 'Edit tags',
                               ),
                               const SizedBox(width: 8),
                               IconButton(

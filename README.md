@@ -24,8 +24,17 @@ A powerful, intuitive Flutter mobile application that lets you capture your thou
 - Manual transcript editing for corrections
 - Recording timer shows duration of each note
 
-### 🏷️ **Smart Organization**
+### 🎵 **Audio Playback & Local Storage**
+- Play recorded audio directly from the app
+- Professional audio player with play/pause controls
+- Progress slider to seek through audio
+- Time duration display (current/total)
+- All audio files stored locally on device
+- No cloud dependency for recordings
+
+### 🏷️ **Smart Organization & Tag Management**
 - **Tagging System**: Add comma-separated tags to categorize notes
+- **Quick Tag Editing**: Edit tags directly from home screen with one tap
 - **Title Management**: Create meaningful titles for quick identification
 - **Timestamps**: Automatic date and time recording for each note
 - **Custom Tags**: Organize by project, priority, category, or any custom tag
@@ -53,9 +62,16 @@ A powerful, intuitive Flutter mobile application that lets you capture your thou
 - Full note removal capability
 - Undo support through note history
 
+### 📤 **Share Transcript**
+- Share note content via email, messaging, and social media
+- Share includes title, date, tags, and full transcript
+- Formatted sharing for better readability
+- Platform-native sharing dialog
+
 ### 💾 **Local Storage**
 - All data stored locally using Hive database
-- No cloud dependency - your notes stay private
+- All audio files stored in device storage
+- No cloud dependency - your notes and recordings stay private
 - Fast, reliable offline-first operation
 - Automatic data persistence
 
@@ -107,6 +123,10 @@ A powerful, intuitive Flutter mobile application that lets you capture your thou
 - **Hive 2.2.3** - Fast, efficient local database
 - **hive_flutter 1.1.0** - Flutter integration for Hive
 - **speech_to_text 6.6.2** - Voice recognition engine
+- **record 5.0.0** - Audio recording library
+- **audio_players 5.0.0** - Audio playback library
+- **share_plus 7.2.0** - Platform-native sharing
+- **path_provider 2.1.0** - Access device storage paths
 - **Material Design 3** - Modern UI components
 
 ### Architecture
