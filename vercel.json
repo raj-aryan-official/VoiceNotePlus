@@ -1,33 +1,20 @@
 {
-  "buildCommand": "flutter build web --release",
+  "buildCommand": "flutter pub get && flutter build web --release",
   "outputDirectory": "build/web",
-  "env": {
-    "FLUTTER_WEB_CANVASKIT_URL": "https://www.gstatic.com/flutter-canvaskit/"
-  },
-  "headers": [
+  "routes": [
     {
-      "source": "/index.html",
-      "headers": [
-        {
-          "key": "Cache-Control",
-          "value": "public, max-age=0, must-revalidate"
-        }
-      ]
+      "src": "/index.html",
+      "dest": "/index.html",
+      "headers": {
+        "cache-control": "public, max-age=0, must-revalidate"
+      }
     },
     {
-      "source": "/(.+)",
-      "headers": [
-        {
-          "key": "Cache-Control",
-          "value": "public, max-age=31536000, immutable"
-        }
-      ]
-    }
-  ],
-  "rewrites": [
-    {
-      "source": "/(.*)",
-      "destination": "/index.html"
+      "src": "/(.+)",
+      "dest": "/index.html",
+      "headers": {
+        "cache-control": "public, max-age=31536000, immutable"
+      }
     }
   ]
 }
