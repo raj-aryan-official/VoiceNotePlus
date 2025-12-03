@@ -22,6 +22,10 @@ class DatabaseHelper {
         await Hive.deleteBoxFromDisk('notes');
         _notesBox = await Hive.openBox<Map>('notes');
       }
+      
+      // Initialize counter based on existing notes
+      _noteCounter = _notesBox.keys.length;
+      
       _isInitialized = true;
     }
   }

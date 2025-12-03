@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:just_audio/just_audio.dart';
 import 'package:share_plus/share_plus.dart';
 import 'note_model.dart';
 import 'database_helper.dart';
@@ -18,11 +17,7 @@ class _NoteDetailScreenState extends State<NoteDetailScreen> {
   late TextEditingController _titleController;
   late TextEditingController _contentController;
   late TextEditingController _tagsController;
-  late AudioPlayer _audioPlayer;
   bool _isEditing = false;
-  bool _isPlaying = false;
-  Duration _duration = Duration.zero;
-  Duration _position = Duration.zero;
 
   @override
   void initState() {
@@ -31,32 +26,6 @@ class _NoteDetailScreenState extends State<NoteDetailScreen> {
     _titleController = TextEditingController(text: _note.title);
     _contentController = TextEditingController(text: _note.content);
     _tagsController = TextEditingController(text: _note.tags);
-    _audioPlayer = AudioPlayer();
-    
-    // Listen to audio player events
-    _audioPlayer.playerStateStream.listen((playerState) {
-      if (mounted) {
-        setState(() {
-          _isPlaying = playerState.playing;
-        });
-      }
-    });
-
-    _audioPlayer.durationStream.listen((duration) {
-      if (mounted && duration != null) {
-        setState(() {
-          _duration = duration;
-        });
-      }
-    });
-
-    _audioPlayer.positionStream.listen((position) {
-      if (mounted) {
-        setState(() {
-          _position = position;
-        });
-      }
-    });
   }
 
   @override
@@ -64,31 +33,7 @@ class _NoteDetailScreenState extends State<NoteDetailScreen> {
     _titleController.dispose();
     _contentController.dispose();
     _tagsController.dispose();
-    _audioPlayer.dispose();
     super.dispose();
-  }
-
-  String _formatDuration(Duration duration) {
-    final minutes = duration.inMinutes;
-    final seconds = duration.inSeconds % 60;
-    return '$minutes:${seconds.toString().padLeft(2, '0')}';
-  }
-
-  void _playAudio() async {
-    try {
-      if (_isPlaying) {
-        await _audioPlayer.pause();
-      } else {
-        await _audioPlayer.setAsset(_note.recordingPath);
-        await _audioPlayer.play();
-      }
-    } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Error playing audio: ${e.toString()}')),
-        );
-      }
-    }
   }
 
   void _shareTranscript() async {
@@ -130,7 +75,7 @@ ${_note.content}
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text(_note.isLiked ? 'Added to favorites' : 'Removed from favorites'),
-            backgroundColor: _note.isLiked ? const Color(0xFFA5D6A7) : const Color(0xFFFFE082),
+            backgroundColor: _note.isLiked ? const Color(0xFF4CAF50) : const Color(0xFFFF9800),
             duration: const Duration(seconds: 1),
           ),
         );
@@ -144,44 +89,7 @@ ${_note.content}
     }
   }
 
-  void _deleteRecording() {
-    showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Delete Recording'),
-        content: const Text('Are you sure you want to delete the recording? The note will still be kept.'),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('Cancel'),
-          ),
-          TextButton(
-            onPressed: () {
-              Navigator.pop(context);
-              setState(() {
-                _note = Note(
-                  id: _note.id,
-                  title: _note.title,
-                  content: _note.content,
-                  dateTime: _note.dateTime,
-                  tags: _note.tags,
-                  isLiked: _note.isLiked,
-                  recordingPath: '',
-                );
-              });
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(
-                  content: Text('Recording deleted'),
-                  backgroundColor: Color(0xFFA5D6A7),
-                ),
-              );
-            },
-            child: const Text('Delete', style: TextStyle(color: Color(0xFFEF9A9A))),
-          ),
-        ],
-      ),
-    );
-  }
+
 
   void _deleteNote() {
     showDialog(
@@ -204,7 +112,7 @@ ${_note.content}
                   ScaffoldMessenger.of(context).showSnackBar(
                     const SnackBar(
                       content: Text('Note deleted successfully'),
-                      backgroundColor: Color(0xFFA5D6A7),
+                      backgroundColor: Color(0xFF4CAF50),
                     ),
                   );
                 }
@@ -216,7 +124,7 @@ ${_note.content}
                 }
               }
             },
-            child: const Text('Delete', style: TextStyle(color: Color(0xFFEF9A9A))),
+            child: const Text('Delete', style: TextStyle(color: Color(0xFFF44336))),
           ),
         ],
       ),
@@ -249,7 +157,7 @@ ${_note.content}
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
             content: Text('Note updated successfully'),
-            backgroundColor: Color(0xFFA5D6A7),
+              backgroundColor: Color(0xFF4CAF50),
           ),
         );
       }
@@ -290,7 +198,7 @@ ${_note.content}
               IconButton(
                 icon: Icon(
                   _note.isLiked ? Icons.favorite : Icons.favorite_border,
-                  color: _note.isLiked ? const Color(0xFFCE93D8) : Colors.white,
+                  color: _note.isLiked ? const Color(0xFF26A69A) : Colors.white,
                 ),
                 onPressed: _toggleLike,
               ),
@@ -302,7 +210,7 @@ ${_note.content}
             if (!_isEditing)
               IconButton(
                 icon: const Icon(Icons.delete),
-                color: const Color(0xFFEF9A9A),
+                color: const Color(0xFFF44336),
                 onPressed: _deleteNote,
               ),
             if (_isEditing)
@@ -313,7 +221,7 @@ ${_note.content}
             if (_isEditing)
               TextButton(
                 onPressed: _saveChanges,
-                child: const Text('Save', style: TextStyle(color: Color(0xFFA5D6A7))),
+                child: const Text('Save', style: TextStyle(color: Color(0xFF4CAF50))),
               ),
           ],
         ),
@@ -326,7 +234,7 @@ ${_note.content}
                 width: double.infinity,
                 padding: const EdgeInsets.all(16.0),
                 decoration: const BoxDecoration(
-                  color: Color(0xFFF3E5F5),
+                  color: Color(0xFFE0F2F1),
                 ),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
@@ -378,7 +286,7 @@ ${_note.content}
                               ),
                               contentPadding: const EdgeInsets.all(12.0),
                               filled: true,
-                              fillColor: const Color(0xFFF3E5F5),
+                              fillColor: const Color(0xFFE0F2F1),
                             ),
                           ),
                           const SizedBox(height: 24),
@@ -403,7 +311,7 @@ ${_note.content}
                           ),
                           contentPadding: const EdgeInsets.all(12.0),
                           filled: true,
-                          fillColor: const Color(0xFFF3E5F5),
+                          fillColor: const Color(0xFFE0F2F1),
                         ),
                       )
                     else
@@ -411,9 +319,9 @@ ${_note.content}
                         width: double.infinity,
                         padding: const EdgeInsets.all(12.0),
                         decoration: BoxDecoration(
-                          border: Border.all(color: const Color(0xFFB39DDB), width: 1),
+                          border: Border.all(color: const Color(0xFF00897B), width: 1),
                           borderRadius: BorderRadius.circular(8),
-                          color: const Color(0xFFF3E5F5),
+                          color: const Color(0xFFE0F2F1),
                         ),
                         child: SelectableText(
                           _note.content,
@@ -443,112 +351,14 @@ ${_note.content}
                               ),
                               contentPadding: const EdgeInsets.all(12.0),
                               filled: true,
-                              fillColor: const Color(0xFFF3E5F5),
+                              fillColor: const Color(0xFFE0F2F1),
                             ),
                           ),
                           const SizedBox(height: 24),
                         ],
                       ),
                     
-                    // Recording Section with Playback
-                    if (_note.recordingPath.isNotEmpty)
-                      Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          const Text(
-                            'Recording',
-                            style: TextStyle(
-                              fontSize: 16,
-                              fontWeight: FontWeight.bold,
-                            ),
-                          ),
-                          const SizedBox(height: 12),
-                          Container(
-                            width: double.infinity,
-                            padding: const EdgeInsets.all(12.0),
-                            decoration: BoxDecoration(
-                              border: Border.all(color: const Color(0xFFB39DDB)),
-                              borderRadius: BorderRadius.circular(8),
-                              color: const Color(0xFFF3E5F5),
-                            ),
-                            child: Column(
-                              children: [
-                                Row(
-                                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                                  children: [
-                                    const Icon(Icons.audio_file, color: Color(0xFF9575CD)),
-                                    const SizedBox(width: 12),
-                                    Expanded(
-                                      child: Text(
-                                        _note.recordingPath.split('/').last,
-                                        overflow: TextOverflow.ellipsis,
-                                        style: const TextStyle(fontSize: 14),
-                                      ),
-                                    ),
-                                    IconButton(
-                                      icon: const Icon(Icons.delete, color: Color(0xFFEF9A9A)),
-                                      onPressed: _deleteRecording,
-                                      tooltip: 'Delete recording',
-                                    ),
-                                  ],
-                                ),
-                                const SizedBox(height: 12),
-                                // Audio player controls
-                                Row(
-                                  children: [
-                                    IconButton(
-                                      icon: Icon(
-                                        _isPlaying ? Icons.pause_circle : Icons.play_circle,
-                                        color: const Color(0xFF9575CD),
-                                        size: 32,
-                                      ),
-                                      onPressed: _playAudio,
-                                    ),
-                                    Expanded(
-                                      child: Column(
-                                        children: [
-                                          SliderTheme(
-                                            data: SliderThemeData(
-                                              trackHeight: 4.0,
-                                              thumbShape: const RoundSliderThumbShape(enabledThumbRadius: 6),
-                                              activeTrackColor: const Color(0xFF9575CD),
-                                              inactiveTrackColor: const Color(0xFFE0BEE7),
-                                            ),
-                                            child: Slider(
-                                              value: _position.inSeconds.toDouble(),
-                                              max: _duration.inSeconds > 0 ? _duration.inSeconds.toDouble() : 1,
-                                              onChanged: (value) async {
-                                                await _audioPlayer.seek(Duration(seconds: value.toInt()));
-                                              },
-                                            ),
-                                          ),
-                                          Padding(
-                                            padding: const EdgeInsets.symmetric(horizontal: 12.0),
-                                            child: Row(
-                                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                                              children: [
-                                                Text(
-                                                  _formatDuration(_position),
-                                                  style: const TextStyle(fontSize: 12),
-                                                ),
-                                                Text(
-                                                  _formatDuration(_duration),
-                                                  style: const TextStyle(fontSize: 12),
-                                                ),
-                                              ],
-                                            ),
-                                          ),
-                                        ],
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                              ],
-                            ),
-                          ),
-                          const SizedBox(height: 24),
-                        ],
-                      ),
+
                   ],
                 ),
               ),

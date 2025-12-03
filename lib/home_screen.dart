@@ -62,7 +62,7 @@ class _HomeScreenState extends State<HomeScreen> {
               _deleteNote(id);
               Navigator.pop(context);
             },
-            child: const Text('Delete', style: TextStyle(color: Color(0xFFEF9A9A))),
+            child: const Text('Delete', style: TextStyle(color: Color(0xFFF44336))),
           ),
         ],
       ),
@@ -75,32 +75,38 @@ class _HomeScreenState extends State<HomeScreen> {
       context: context,
       builder: (context) => AlertDialog(
         title: const Text('Edit Tags'),
-        content: TextField(
-          controller: controller,
-          maxLines: 3,
-          decoration: InputDecoration(
-            hintText: 'Enter tags separated by commas (e.g., work, important)',
-            border: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(8),
+        content: SingleChildScrollView(
+          child: TextField(
+            controller: controller,
+            maxLines: 3,
+            decoration: InputDecoration(
+              hintText: 'Enter tags separated by commas (e.g., work, important)',
+              border: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(8),
+              ),
+              filled: true,
+              fillColor: const Color(0xFFE0F2F1),
             ),
-            filled: true,
-            fillColor: const Color(0xFFF3E5F5),
           ),
         ),
         actions: [
           TextButton(
-            onPressed: () => Navigator.pop(context),
+            onPressed: () {
+              controller.dispose();
+              Navigator.pop(context);
+            },
             child: const Text('Cancel'),
           ),
           TextButton(
             onPressed: () {
               DatabaseHelper().updateNote(id, tags: controller.text);
+              controller.dispose();
               Navigator.pop(context);
               _refreshNotes();
               ScaffoldMessenger.of(context).showSnackBar(
                 const SnackBar(
                   content: Text('Tags updated'),
-                  backgroundColor: Color(0xFFA5D6A7),
+                  backgroundColor: Color(0xFF4CAF50),
                 ),
               );
             },
@@ -109,7 +115,6 @@ class _HomeScreenState extends State<HomeScreen> {
         ],
       ),
     );
-    controller.dispose();
   }
 
   @override
@@ -126,7 +131,7 @@ class _HomeScreenState extends State<HomeScreen> {
           Container(
             padding: const EdgeInsets.all(12.0),
             decoration: BoxDecoration(
-              color: const Color(0xFFF3E5F5),
+              color: const Color(0xFFE0F2F1),
               boxShadow: [
                 BoxShadow(
                   color: Colors.grey.withOpacity(0.1),
@@ -147,7 +152,7 @@ class _HomeScreenState extends State<HomeScreen> {
                   },
                   decoration: InputDecoration(
                     hintText: 'Search by title, content, or tags...',
-                    prefixIcon: const Icon(Icons.search, color: Color(0xFF9575CD)),
+                    prefixIcon: const Icon(Icons.search, color: Color(0xFF00695C)),
                     suffixIcon: _searchQuery.isNotEmpty
                         ? IconButton(
                             icon: const Icon(Icons.clear),
@@ -162,7 +167,7 @@ class _HomeScreenState extends State<HomeScreen> {
                         : null,
                     border: OutlineInputBorder(
                       borderRadius: BorderRadius.circular(12),
-                      borderSide: const BorderSide(color: Color(0xFFB39DDB)),
+                      borderSide: const BorderSide(color: Color(0xFF00897B)),
                     ),
                     filled: true,
                     fillColor: Colors.white,
@@ -185,7 +190,7 @@ class _HomeScreenState extends State<HomeScreen> {
                         icon: const Icon(Icons.dashboard),
                         label: const Text('All Notes'),
                         style: ElevatedButton.styleFrom(
-                          backgroundColor: !_showLikedOnly ? const Color(0xFF9575CD) : const Color(0xFFE0E0E0),
+                          backgroundColor: !_showLikedOnly ? const Color(0xFF00695C) : const Color(0xFFE0E0E0),
                           foregroundColor: !_showLikedOnly ? Colors.white : Colors.black87,
                           shape: RoundedRectangleBorder(
                             borderRadius: BorderRadius.circular(10),
@@ -207,7 +212,7 @@ class _HomeScreenState extends State<HomeScreen> {
                         icon: const Icon(Icons.favorite),
                         label: const Text('Liked'),
                         style: ElevatedButton.styleFrom(
-                          backgroundColor: _showLikedOnly ? const Color(0xFFCE93D8) : const Color(0xFFE0E0E0),
+                          backgroundColor: _showLikedOnly ? const Color(0xFF26A69A) : const Color(0xFFE0E0E0),
                           foregroundColor: _showLikedOnly ? Colors.white : Colors.black87,
                           shape: RoundedRectangleBorder(
                             borderRadius: BorderRadius.circular(10),

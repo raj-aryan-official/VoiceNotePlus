@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:hive_flutter/hive_flutter.dart';
 import 'database_helper.dart';
-import 'home_screen.dart';
+import 'splash_screen.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -24,23 +24,23 @@ class MyApp extends StatelessWidget {
       theme: ThemeData(
         useMaterial3: true,
         colorScheme: ColorScheme.fromSeed(
-          seedColor: const Color(0xFF9575CD),
-          primary: const Color(0xFF9575CD),
-          secondary: const Color(0xFFB39DDB),
-          tertiary: const Color(0xFFCE93D8),
-          surface: const Color(0xFFF3E5F5),
-          error: const Color(0xFFEF9A9A),
+          seedColor: const Color(0xFF00695C),
+          primary: const Color(0xFF00695C),
+          secondary: const Color(0xFF00897B),
+          tertiary: const Color(0xFF26A69A),
+          surface: const Color(0xFFE0F2F1),
+          error: const Color(0xFFF44336),
         ),
         appBarTheme: const AppBarTheme(
-          backgroundColor: Color(0xFF9575CD),
+          backgroundColor: Color(0xFF00695C),
           foregroundColor: Colors.white,
         ),
         floatingActionButtonTheme: const FloatingActionButtonThemeData(
-          backgroundColor: Color(0xFF9575CD),
+          backgroundColor: Color(0xFF00695C),
           foregroundColor: Colors.white,
         ),
       ),
-      home: const HomeScreen(),
+      home: const SplashScreen(),
     );
   }
 }
