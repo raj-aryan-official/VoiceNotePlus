@@ -109,7 +109,8 @@ A powerful, intuitive Flutter mobile application that lets you capture your thou
   - Update tags
 - Like/Unlike button for favoriting
 - Delete options for recording or entire note
-- Beautiful purple/pink themed interface
+- Share transcript functionality
+- Beautiful teal-themed Material Design 3 interface
 
 ---
 
@@ -122,30 +123,31 @@ A powerful, intuitive Flutter mobile application that lets you capture your thou
 ### Core Dependencies
 - **Hive 2.2.3** - Fast, efficient local database
 - **hive_flutter 1.1.0** - Flutter integration for Hive
-- **speech_to_text 6.6.2** - Voice recognition engine
-- **record 5.0.0** - Audio recording library
-- **audio_players 5.0.0** - Audio playback library
+- **speech_to_text 6.6.1** - Voice recognition engine
+- **permission_handler 11.3.1** - Handle device permissions
+- **intl 0.19.0** - Internationalization and date formatting
 - **share_plus 7.2.0** - Platform-native sharing
 - **path_provider 2.1.0** - Access device storage paths
 - **Material Design 3** - Modern UI components
 
 ### Architecture
 - **StatefulWidget** - Dynamic UI state management
-- **Factory Pattern** - Singleton database helper
-- **Local-First Data** - All storage on device
+- **Singleton Pattern** - DatabaseHelper for centralized data access
+- **Local-First Data** - All storage on device (Hive database)
+- **Splash Screen** - Branding and initialization
+- **Material Design 3** - Modern UI components and theming
 
 ---
 
 ## 🎨 Design & UX
 
 ### Color Scheme
-- **Primary**: Purple (#9575CD)
-- **Secondary**: Light Purple (#B39DDB)
-- **Accent**: Pink (#CE93D8)
-- **Surface**: Very Light Purple (#F3E5F5)
-- **Success**: Green (#A5D6A7)
-- **Warning**: Yellow (#FFE082)
-- **Error**: Red (#EF9A9A)
+- **Primary**: Dark Teal (#00695C)
+- **Secondary**: Medium Teal (#00897B)
+- **Tertiary**: Light Teal (#26A69A)
+- **Surface**: Very Light Teal (#E0F2F1)
+- **Error**: Red (#F44336)
+- **Material Design 3**: Modern, adaptive design system
 
 ### Responsive Design
 - Optimized for various screen sizes
@@ -207,34 +209,100 @@ A powerful, intuitive Flutter mobile application that lets you capture your thou
 
 ```bash
 # Clone the repository
-git clone https://github.com/raj-aryan-official/Voice-notes-plus.git
+git clone https://github.com/raj-aryan-official/VoiceNotePlus.git
 cd Voice-notes-plus
 
 # Install dependencies
 flutter pub get
 
 # Run the app
-flutter run -d chrome        # For web browser
-flutter run -d android       # For Android emulator
-flutter run -d ios          # For iOS simulator
-flutter run -d windows      # For Windows desktop
+flutter run -d chrome --web-port=5005    # For web browser (port 5005)
+flutter run -d android                  # For Android emulator/device
+flutter run -d ios                      # For iOS simulator
+flutter run -d windows                  # For Windows desktop
 ```
+
+### Development Setup
+
+1. **Install Flutter SDK:**
+   - Download from: https://flutter.dev/docs/get-started/install
+   - Add Flutter to your PATH
+
+2. **Verify Installation:**
+   ```bash
+   flutter doctor
+   ```
+
+3. **Get Dependencies:**
+   ```bash
+   flutter pub get
+   ```
+
+4. **Run in Development Mode:**
+   ```bash
+   flutter run -d chrome --web-port=5005
+   ```
 
 ### Build for Production
 
 ```bash
-# Android APK
-flutter build apk
+# Android APK (Release)
+flutter build apk --release
+# Output: build/app/outputs/flutter-apk/app-release.apk
 
-# iOS App
-flutter build ios
+# Android APK (Split by architecture - smaller size)
+flutter build apk --split-per-abi --release
 
-# Web
-flutter build web
+# Android App Bundle (for Google Play Store)
+flutter build appbundle --release
+
+# Web (for deployment)
+flutter build web --release
+# Output: build/web/
 
 # Windows
-flutter build windows
+flutter build windows --release
+
+# iOS (requires macOS and Xcode)
+flutter build ios --release
 ```
+
+📖 **Detailed build instructions:** See [BUILD_APK_GUIDE.md](BUILD_APK_GUIDE.md) for APK building guide.
+
+---
+
+## 🌐 Deployment
+
+### Web Deployment (Vercel)
+
+The app is configured for easy deployment on Vercel:
+
+1. **Automatic Deployment:**
+   - Push to GitHub: `git push origin main`
+   - Vercel automatically builds and deploys
+
+2. **Manual Deployment:**
+   ```bash
+   # Install Vercel CLI
+   npm install -g vercel
+   
+   # Login
+   vercel login
+   
+   # Deploy
+   vercel --prod
+   ```
+
+3. **Configuration:**
+   - Build Command: `bash build.sh`
+   - Output Directory: `build/web`
+   - Framework Preset: Other
+
+📖 **Full deployment guide:** See [DEPLOYMENT.md](DEPLOYMENT.md) for detailed instructions.
+
+### Live Demo
+
+🌐 **Web App:** [Deployed on Vercel](https://voice-notes-plus.vercel.app) (if deployed)
 
 ---
 
@@ -280,16 +348,17 @@ flutter build windows
 
 ## 🐛 Known Limitations
 
-- Recording requires microphone permission
-- Speech recognition quality depends on audio clarity and background noise
-- Some accents and languages may require training data
-- Large note collections (1000+) may have slight performance impact
+- **Microphone Permission**: Recording requires microphone permission on all platforms
+- **Speech Recognition**: Quality depends on audio clarity, background noise, and accent
+- **Web Platform**: Microphone access requires HTTPS (works automatically on Vercel)
+- **Language Support**: Speech recognition works best with languages supported by device
+- **Performance**: Large note collections (1000+) may have slight performance impact
+- **Android SDK**: Required for building APK (see [BUILD_APK_GUIDE.md](BUILD_APK_GUIDE.md))
 
 ---
 
 ## 📈 Future Enhancements
 
-- 🎵 Audio playback feature for recordings
 - 📤 Cloud sync option (optional, privacy-preserving)
 - 🌍 Multi-language support
 - 📊 Analytics dashboard (local only)
@@ -297,6 +366,8 @@ flutter build windows
 - 📤 Export notes as PDF/Text
 - 🔐 Biometric authentication
 - 🤖 AI-powered note summaries
+- 📱 Progressive Web App (PWA) features
+- 🔄 Auto-backup to local storage
 
 ---
 
@@ -318,11 +389,20 @@ This project is open source and available under the [MIT License](LICENSE).
 
 ---
 
+## 📚 Additional Documentation
+
+- 📖 [Deployment Guide](DEPLOYMENT.md) - Deploy to Vercel
+- 📱 [APK Build Guide](BUILD_APK_GUIDE.md) - Build Android APK
+- 🏗️ [Project Details](PROJECT_DETAILS.md) - Technical documentation
+- 📋 [Product Requirements](PRD.md) - Product specifications
+
+---
+
 ## 👨‍💻 Author
 
 **Raj Aryan**
 - GitHub: [@raj-aryan-official](https://github.com/raj-aryan-official)
-- Repository: [Voice-notes-plus](https://github.com/raj-aryan-official/Voice-notes-plus)
+- Repository: [VoiceNotePlus](https://github.com/raj-aryan-official/VoiceNotePlus)
 
 ---
 
