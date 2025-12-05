@@ -1,0 +1,10 @@
+{
+  "buildCommand": "bash build.sh",
+  "outputDirectory": "build/web",
+  "rewrites": [
+    {
+      "source": "/((?!.*\\.(js|css|wasm|json|png|jpg|jpeg|gif|ico|svg|woff|woff2|ttf|otf|bin|html|xml|txt|map)).*)",
+      "destination": "/index.html"
+    }
+  ]
+}
