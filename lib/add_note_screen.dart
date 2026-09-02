@@ -117,255 +117,303 @@ class AddNoteScreen extends StatefulWidget {
 class _AddNoteScreenState extends State<AddNoteScreen> with TickerProviderStateMixin {
   // ====== SPEECH RECOGNITION ======
   /// SpeechToText instance for converting voice to text
-  /// Lazy initialized in initState
   late stt.SpeechToText _speech;
+  bool _speechInitialized = false;
   
   /// Recording state: true when actively listening to microphone
-  /// Used to control mic button color and appearance
   bool _isListening = false;
   
-  /// Pause state: true when recording is paused (not listening but can resume)
-  /// Enables three-state control: stopped → recording → paused → recording
+  /// Pause state: true when recording is paused
   bool _isPaused = false;
   
-  /// Current recognized text from speech recognition
-  /// Gets cleared and combined with _previousText
-  String _text = '';
+  /// Accumulated text from previous sessions/sentences
+  String _accumulatedText = '';
   
-  /// Accumulated text from previous recognition sessions
-  /// Preserves content when recording is paused and resumed
-  String _previousText = '';
+  /// Current active recognition text in progress
+  String _currentWords = '';
   
   // ====== TEXT CONTROLLERS ======
   /// Controller for note title TextField
-  /// Auto-populated with current date/time if not provided
   final TextEditingController _titleController = TextEditingController();
   
   /// Controller for transcript/content TextArea
-  /// Pre-populated with recognized speech in real-time
-  /// Can be manually edited by user
   final TextEditingController _contentController = TextEditingController();
   
   /// Controller for tags TextField
-  /// Comma-separated tags for categorizing notes
   final TextEditingController _tagsController = TextEditingController();
   
   /// Current status message displayed to user
-  /// Updated with recording state changes
   String _statusText = 'Tap microphone to start recording';
   
   // ====== TIMER VARIABLES ======
-  /// Timer object for tracking recording duration
-  /// Null when not recording, active when recording
   Timer? _timer;
-  
-  /// Elapsed seconds since recording started
-  /// Displayed to user and reset on new recording
   int _seconds = 0;
   
   // ====== ANIMATION VARIABLES ======
-  /// AnimationController for waveform bar animation
-  /// Duration: 1500ms for smooth continuous animation
   late AnimationController _waveController;
-  
-  /// Animation value (0.0 to 1.0) driving waveform visual effect
-  /// Value passed to WaveformPainter for bar height calculation
   late Animation<double> _waveAnimation;
   
   /// ====== LIFECYCLE: INITIALIZATION ======
   @override
   void initState() {
     super.initState();
-    
-    // Initialize SpeechToText plugin
     _speech = stt.SpeechToText();
-    _initSpeech();  // Request microphone permission
+    _initSpeech();
     
-    // ====== WAVEFORM ANIMATION SETUP ======
-    // Create animation controller for 1500ms continuous loop
+    // Waveform animation setup
     _waveController = AnimationController(
       duration: const Duration(milliseconds: 1500),
-      vsync: this,  // Using TickerProviderStateMixin
+      vsync: this,
     );
-    
-    // Create animation: 0.0 → 1.0 with linear curve (constant speed)
     _waveAnimation = Tween<double>(begin: 0.0, end: 1.0).animate(
       CurvedAnimation(parent: _waveController, curve: Curves.linear),
     );
   }
 
-  /// ====== MICROPHONE PERMISSION ======
-  /// Request microphone permission from user
-  /// Called during initialization before any recording
+  /// Request microphone permission on launch
   void _initSpeech() async {
-    var status = await Permission.microphone.status;
-    if (!status.isGranted) {
-      await Permission.microphone.request();
+    try {
+      var status = await Permission.microphone.status;
+      if (!status.isGranted) {
+        await Permission.microphone.request();
+      }
+    } catch (e) {
+      print('Permission check error: $e');
     }
   }
 
-  /// ====== TIME FORMATTING ======
+  /// Ensure speech engine is initialized and permissions granted
+  Future<bool> _ensureSpeechInitialized() async {
+    if (_speechInitialized && _speech.isAvailable) return true;
+
+    try {
+      var status = await Permission.microphone.status;
+      if (!status.isGranted) {
+        status = await Permission.microphone.request();
+        if (!status.isGranted) {
+          if (mounted) {
+            setState(() {
+              _statusText = 'Microphone permission required.';
+            });
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(
+                content: Text('Microphone permission is required to record voice notes.'),
+                backgroundColor: Color(0xFFF44336),
+              ),
+            );
+          }
+          return false;
+        }
+      }
+
+      _speechInitialized = await _speech.initialize(
+        onStatus: (status) {
+          print('Speech status: $status');
+          if (mounted) {
+            if (status == 'listening') {
+              setState(() {
+                _statusText = 'Listening... Speak now';
+              });
+            } else if (status == 'notListening' || status == 'done') {
+              if (_isListening && !_isPaused) {
+                _onSessionFinished();
+              }
+            }
+          }
+        },
+        onError: (errorNotification) {
+          print('Speech error: ${errorNotification.errorMsg}');
+          if (mounted && _isListening && !_isPaused) {
+            _onSessionFinished();
+          }
+        },
+        debugLogging: false,
+      );
+    } catch (e) {
+      _speechInitialized = false;
+      print('Error initializing speech: $e');
+    }
+
+    if (!_speechInitialized && mounted) {
+      setState(() {
+        _statusText = 'Speech recognition unavailable. You can type manually.';
+      });
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Speech recognition is not available. You can type your note manually.'),
+          backgroundColor: Color(0xFFFF9800),
+        ),
+      );
+    }
+
+    return _speechInitialized;
+  }
+
   /// Convert seconds to MM:SS format for display
-  /// 
-  /// Example:
-  ///   - 5 seconds → "00:05"
-  ///   - 65 seconds → "01:05"
-  ///   - 125 seconds → "02:05"
   String _formatTime(int seconds) {
     int minutes = seconds ~/ 60;
     int secs = seconds % 60;
     return '${minutes.toString().padLeft(2, '0')}:${secs.toString().padLeft(2, '0')}';
   }
 
-  /// ====== TIMER MANAGEMENT ======
-  /// Start a 1-second repeating timer to track recording duration
-  /// Also starts the waveform animation
+  /// Start recording timer and waveform
   void _startTimer() {
-    _timer?.cancel();  // Cancel any existing timer
-    // Create new timer: increments _seconds every 1 second
+    _timer?.cancel();
     _timer = Timer.periodic(const Duration(seconds: 1), (timer) {
-      setState(() {
-        _seconds++;
-      });
+      if (mounted) {
+        setState(() {
+          _seconds++;
+        });
+      }
     });
     
-    // Start waveform animation (repeats continuously)
     if (!_waveController.isAnimating) {
-      _waveController.repeat();  // Loop animation until stopped
+      _waveController.repeat();
     }
   }
 
-  /// ====== TIMER STOP ======
-  /// Stop the recording timer and waveform animation
+  /// Stop recording timer and waveform
   void _stopTimer() {
     _timer?.cancel();
     _waveController.stop();
   }
 
-  /// ====== RECORDING RESET ======
-  /// Reset all recording state and controllers
-  /// Called when user clicks "Reset" button
-  void _resetRecording() {
+  /// Reset recording state
+  void _resetRecording() async {
     _stopTimer();
+    try {
+      if (_speech.isListening) {
+        await _speech.stop();
+      }
+    } catch (e) {
+      print('Stop error: $e');
+    }
+
     if (mounted) {
       setState(() {
-        _seconds = 0;              // Reset timer
-        _text = '';                // Clear current recognition
-        _previousText = '';        // Clear accumulated text
-        _contentController.clear();    // Clear transcript
-        _isListening = false;      // Not recording
-        _isPaused = false;         // Not paused
-        _statusText = 'Recording reset. Tap microphone to start again.';
+        _seconds = 0;
+        _accumulatedText = '';
+        _currentWords = '';
+        _contentController.clear();
+        _titleController.clear();
+        _tagsController.clear();
+        _isListening = false;
+        _isPaused = false;
+        _statusText = 'Recording reset. Tap microphone to start.';
       });
     }
   }
 
-  /// ====== THREE-STATE RECORDING CONTROL ======
-  /// 
-  /// Main method handling all recording state transitions
-  /// Implements three-state recording: STOPPED → RECORDING → PAUSED
-  /// 
-  /// STATE 1 (Stopped): _isListening=false, _isPaused=false
-  ///   - User taps mic → START RECORDING
-  /// 
-  /// STATE 2 (Recording): _isListening=true, _isPaused=false
-  ///   - User taps mic → PAUSE RECORDING
-  /// 
-  /// STATE 3 (Paused): _isListening=false, _isPaused=true
-  ///   - User taps mic → RESUME RECORDING
-  ///   - User clicks save → SAVE NOTE
-  void _listen() async {
-    if (!_isListening && !_isPaused) {
-      // ====== STATE 1 → STATE 2: START RECORDING ======
-      bool available = await _speech.initialize(
-        onStatus: (val) {
-          print('onStatus: $val');
-          if ((val == 'done' || val == 'notListening') && _isListening && !_isPaused) {
-            _startListening();
-          }
-        },
-        onError: (val) => print('onError: $val'),
-      );
-      if (available && mounted) {
-        setState(() {
-          _isListening = true;    // Now recording
-          _isPaused = false;      // Not paused
-        });
-        _startListening();  // Begin speech recognition
-      }
-    } else if (_isListening && !_isPaused) {
-      // ====== STATE 2 → STATE 3: PAUSE RECORDING ======
-      _speech.stop();     // Stop listening
-      _stopTimer();       // Stop timer (waveform stops)
-      if (mounted) {
-        setState(() {
-          _isListening = false;   // Not listening
-          _isPaused = true;       // In paused state
-          _statusText = 'Recording paused. Tap to resume or save.';
-        });
-      }
-    } else if (_isPaused) {
-      // ====== STATE 3 → STATE 2: RESUME RECORDING ======
-      bool available = await _speech.initialize(
-        onStatus: (val) {
-          print('onStatus: $val');
-          if ((val == 'done' || val == 'notListening') && _isListening && !_isPaused) {
-            _startListening();
-          }
-        },
-        onError: (val) => print('onError: $val'),
-      );
-      if (available && mounted) {
-        setState(() {
-          _isListening = true;    // Resume listening
-          _isPaused = false;      // No longer paused
-        });
-        _startListening();  // Resume speech recognition
-      }
+  /// Handles continuous speech session recovery
+  void _onSessionFinished() {
+    if (!mounted) return;
+    
+    if (_currentWords.isNotEmpty) {
+      _accumulatedText = _contentController.text.trim();
+      _currentWords = '';
+    }
+
+    // Seamlessly restart session if still recording
+    if (_isListening && !_isPaused) {
+      Future.delayed(const Duration(milliseconds: 250), () {
+        if (mounted && _isListening && !_isPaused) {
+          _listenSession();
+        }
+      });
     }
   }
 
-  /// ====== START SPEECH RECOGNITION ======
-  /// Begin listening to microphone and converting speech to text
-  /// Callback processes recognized words continuously
-  void _startListening() {
-    if (!mounted) return;
-    
-    _startTimer();  // Start recording timer and waveform animation
-    
-    setState(() {
-      _statusText = 'Recording...';
-      _previousText = _contentController.text;  // Save current content
-    });
-    
-    // Listen to microphone with 60-second silence timeout
-    _speech.listen(
-      pauseFor: const Duration(seconds: 60),  // Stop listening after 60s silence
-      onResult: (val) {
-        if (mounted) {
-          setState(() {
-            _text = val.recognizedWords;  // Get recognized text
-            // Combine previous accumulated text with new text
-            if (_previousText.isNotEmpty) {
-              _contentController.text = '$_previousText $_text';
-            } else {
-              _contentController.text = _text;
-            }
-          });
-        }
-      },
-    );
+  /// Run an active listening session
+  void _listenSession() async {
+    if (!mounted || !_isListening || _isPaused) return;
+
+    try {
+      await _speech.listen(
+        onResult: (result) {
+          if (mounted) {
+            setState(() {
+              _currentWords = result.recognizedWords;
+              String combined = _accumulatedText.isEmpty
+                  ? _currentWords
+                  : '$_accumulatedText $_currentWords'.trim();
+              _contentController.text = combined;
+              _contentController.selection = TextSelection.fromPosition(
+                TextPosition(offset: _contentController.text.length),
+              );
+
+              if (result.finalResult) {
+                _accumulatedText = _contentController.text.trim();
+                _currentWords = '';
+              }
+            });
+          }
+        },
+        listenFor: const Duration(seconds: 30),
+        pauseFor: const Duration(seconds: 4),
+        partialResults: true,
+        cancelOnError: false,
+        listenMode: stt.ListenMode.dictation,
+      );
+    } catch (e) {
+      print('Listen error: $e');
+    }
   }
 
-  /// ====== SAVE NOTE DIALOG ======
-  /// Show dialog for user to confirm title, tags, and save recording
-  /// 
-  /// Dialog features:
-  ///   - Title TextField: edit or auto-fill with current date/time
-  ///   - Tags TextField: comma-separated categories
-  ///   - Duration display: shows recording length
-  ///   - Discard button: cancels save and resets recording
-  ///   - Save button: persists note to database
+  /// Main method handling recording state transitions
+  void _listen() async {
+    if (!_isListening && !_isPaused) {
+      // START RECORDING
+      bool ready = await _ensureSpeechInitialized();
+      if (!ready) return;
+
+      _accumulatedText = _contentController.text.trim();
+      _currentWords = '';
+      if (mounted) {
+        setState(() {
+          _isListening = true;
+          _isPaused = false;
+          _statusText = 'Listening... Speak now';
+        });
+      }
+      _startTimer();
+      _listenSession();
+    } else if (_isListening && !_isPaused) {
+      // PAUSE RECORDING
+      try {
+        await _speech.stop();
+      } catch (e) {
+        print('Pause speech error: $e');
+      }
+      _stopTimer();
+      _accumulatedText = _contentController.text.trim();
+      _currentWords = '';
+      if (mounted) {
+        setState(() {
+          _isListening = false;
+          _isPaused = true;
+          _statusText = 'Recording paused. Tap microphone to resume.';
+        });
+      }
+    } else if (_isPaused) {
+      // RESUME RECORDING
+      bool ready = await _ensureSpeechInitialized();
+      if (!ready) return;
+
+      _accumulatedText = _contentController.text.trim();
+      _currentWords = '';
+      if (mounted) {
+        setState(() {
+          _isListening = true;
+          _isPaused = false;
+          _statusText = 'Listening... Speak now';
+        });
+      }
+      _startTimer();
+      _listenSession();
+    }
+  }
+
+  /// Show save confirmation dialog
   void _showSaveDialog() {
     if (_titleController.text.isEmpty) {
       // Auto-fill title with current date/time if not provided
@@ -486,8 +534,8 @@ class _AddNoteScreenState extends State<AddNoteScreen> with TickerProviderStateM
       _contentController.clear();
       _titleController.clear();
       _tagsController.clear();
-      _text = '';
-      _previousText = '';
+      _accumulatedText = '';
+      _currentWords = '';
       _seconds = 0;
       
       if (mounted) {
@@ -503,7 +551,9 @@ class _AddNoteScreenState extends State<AddNoteScreen> with TickerProviderStateM
   @override
   void dispose() {
     _stopTimer();               // Cancel timer if running
-    _speech.stop();             // Stop speech recognition
+    try {
+      _speech.stop();           // Stop speech recognition
+    } catch (_) {}
     _waveController.dispose();  // Dispose animation controller
     _titleController.dispose();      // Dispose text controllers
     _contentController.dispose();
@@ -587,6 +637,12 @@ class _AddNoteScreenState extends State<AddNoteScreen> with TickerProviderStateM
                 maxLines: null,         // Unlimited lines
                 expands: true,          // Fill available space
                 readOnly: false,        // User can edit
+                onChanged: (val) {
+                  setState(() {
+                    _accumulatedText = val;
+                    _currentWords = '';
+                  });
+                },
                 decoration: const InputDecoration(
                   hintText: 'Your speech will appear here... (You can also edit manually)',
                   border: InputBorder.none,

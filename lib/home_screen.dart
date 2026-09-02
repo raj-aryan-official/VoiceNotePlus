@@ -382,49 +382,66 @@ class _HomeScreenState extends State<HomeScreen> {
             ),
           ),
           // ====== NOTES LIST SECTION ======
-          // Displays all notes using async FutureBuilder pattern
-          // Handles loading, error, and empty states gracefully
-          // Each note shown as a Material Card with swipe-friendly ListTile
+          // Displays all notes using async FutureBuilder pattern with pull-to-refresh
           Expanded(
             child: FutureBuilder<List<Map<String, dynamic>>>(
-              future: _notesFuture,  // Future that loads notes with current filter
+              future: _notesFuture,
               builder: (context, snapshot) {
                 // ====== LOADING STATE ======
-                // Show spinner while data is being fetched from database
                 if (snapshot.connectionState == ConnectionState.waiting) {
                   return const Center(child: CircularProgressIndicator());
                 } 
                 // ====== ERROR STATE ======
-                // Display error message if database query fails
                 else if (snapshot.hasError) {
-                  return Center(child: Text('Error: ${snapshot.error}'));
-                } 
-                // ====== EMPTY STATE ======
-                // Show friendly message when no notes exist
-                // Message varies based on current filter:
-                //   - "No liked notes yet" if filtering by likes but none found
-                //   - "No notes found" if search returned no results
-                //   - "No notes yet..." if database is completely empty
-                else if (!snapshot.hasData || snapshot.data!.isEmpty) {
                   return Center(
                     child: Column(
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: [
-                        // Icon changes based on state (heart for liked, note for all)
-                        Icon(
-                          _showLikedOnly ? Icons.favorite_border : Icons.note_outlined,
-                          size: 64,
-                          color: Colors.grey[300],  // Light grey for subtle appearance
+                        const Icon(Icons.error_outline, size: 48, color: Colors.red),
+                        const SizedBox(height: 12),
+                        Text('Error loading notes: ${snapshot.error}'),
+                        const SizedBox(height: 12),
+                        ElevatedButton(
+                          onPressed: _refreshNotes,
+                          child: const Text('Retry'),
                         ),
-                        const SizedBox(height: 16),
-                        // Dynamic message text based on current filter/search
-                        Text(
-                          _showLikedOnly
-                              ? 'No liked notes yet'  // Showing liked filter but none liked
-                              : _searchQuery.isNotEmpty
-                                  ? 'No notes found'  // Search query matched nothing
-                                  : 'No notes yet. Tap + to add one.',  // Database completely empty
-                          style: const TextStyle(fontSize: 16, color: Colors.grey),
+                      ],
+                    ),
+                  );
+                } 
+                // ====== EMPTY STATE ======
+                else if (!snapshot.hasData || snapshot.data!.isEmpty) {
+                  return RefreshIndicator(
+                    onRefresh: () async {
+                      _refreshNotes();
+                    },
+                    child: ListView(
+                      physics: const AlwaysScrollableScrollPhysics(),
+                      children: [
+                        SizedBox(
+                          height: MediaQuery.of(context).size.height * 0.45,
+                          child: Center(
+                            child: Column(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: [
+                                Icon(
+                                  _showLikedOnly ? Icons.favorite_border : Icons.note_outlined,
+                                  size: 64,
+                                  color: Colors.grey[400],
+                                ),
+                                const SizedBox(height: 16),
+                                Text(
+                                  _showLikedOnly
+                                      ? 'No liked notes yet'
+                                      : _searchQuery.isNotEmpty
+                                          ? 'No notes found matching "$_searchQuery"'
+                                          : 'No notes yet. Tap + to record one.',
+                                  style: const TextStyle(fontSize: 16, color: Colors.grey),
+                                  textAlign: TextAlign.center,
+                                ),
+                              ],
+                            ),
+                          ),
                         ),
                       ],
                     ),
@@ -432,142 +449,119 @@ class _HomeScreenState extends State<HomeScreen> {
                 }
 
                 // ====== NOTES LOADED STATE ======
-                // Convert raw database maps to Note objects for type safety
                 final notes = snapshot.data!.map((e) => Note.fromMap(e)).toList();
 
-                // Build scrollable list of note cards
-                return ListView.builder(
-                  itemCount: notes.length,
-                  padding: const EdgeInsets.all(8.0),
-                  itemBuilder: (context, index) {
-                    final note = notes[index];
-                    // ====== NOTE CARD LAYOUT ======
-                    // Material Design Card displaying single note summary
-                    // Shows: Avatar, Title, Preview, Tags, Date, Action buttons
-                    return Card(
-                      margin: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
-                      elevation: 2,  // Subtle shadow for depth
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(12),  // Rounded corners
-                      ),
-                      child: ListTile(
-                        contentPadding: const EdgeInsets.all(12),
-                        // ====== LEADING AVATAR ======
-                        // Purple circle with first letter of title
-                        // Shows 'N' if note is untitled for consistency
-                        leading: CircleAvatar(
-                          backgroundColor: const Color(0xFF9575CD),  // Purple background
-                          child: Text(
-                            note.title.isNotEmpty ? note.title[0].toUpperCase() : 'N',
-                            style: const TextStyle(color: Colors.white),
-                          ),
+                return RefreshIndicator(
+                  onRefresh: () async {
+                    _refreshNotes();
+                  },
+                  child: ListView.builder(
+                    physics: const AlwaysScrollableScrollPhysics(),
+                    itemCount: notes.length,
+                    padding: const EdgeInsets.all(8.0),
+                    itemBuilder: (context, index) {
+                      final note = notes[index];
+                      return Card(
+                        margin: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+                        elevation: 2,
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12),
                         ),
-                        // ====== NOTE TITLE ======
-                        // Bold, larger text showing note title
-                        // Shows "Untitled Note" if no title provided
-                        title: Text(
-                          note.title.isNotEmpty ? note.title : 'Untitled Note',
-                          style: const TextStyle(
-                            fontWeight: FontWeight.bold,
-                            fontSize: 16,
-                          ),
-                        ),
-                        // ====== SUBTITLE SECTION (COMPACT NOTE METADATA) ======
-                        // Displays preview, tags, and metadata in vertical stack
-                        subtitle: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            const SizedBox(height: 4),
-                            // Note content preview - first 2 lines, truncated with ellipsis
-                            Text(
-                              note.content,
-                              maxLines: 2,  // Show at most 2 lines
-                              overflow: TextOverflow.ellipsis,  // ... if longer
-                              style: const TextStyle(fontSize: 13),
+                        child: ListTile(
+                          contentPadding: const EdgeInsets.all(12),
+                          leading: CircleAvatar(
+                            backgroundColor: const Color(0xFF00695C),
+                            child: Text(
+                              note.title.isNotEmpty ? note.title[0].toUpperCase() : 'N',
+                              style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
                             ),
-                            const SizedBox(height: 4),
-                            // Tags display - comma-separated split into individual chips
-                            if (note.tags.isNotEmpty)
-                              Wrap(
-                                spacing: 4,  // Space between chips
-                                children: note.tags.split(',').map((tag) {
-                                  return Chip(
-                                    label: Text(tag.trim()),  // Remove whitespace around tag
-                                    visualDensity: VisualDensity.compact,  // Small chip size
-                                    backgroundColor: const Color(0xFFE0BEE7),  // Light purple background
-                                  );
-                                }).toList(),
-                              ),
-                            const SizedBox(height: 4),
-                            // Timestamp - shows when note was created/saved
-                            Text(
-                              note.dateTime,
-                              style: const TextStyle(fontSize: 11, color: Colors.grey),
+                          ),
+                          title: Text(
+                            note.title.isNotEmpty ? note.title : 'Untitled Note',
+                            style: const TextStyle(
+                              fontWeight: FontWeight.bold,
+                              fontSize: 16,
                             ),
-                          ],
-                        ),
-                        // ====== ACTION BUTTONS (TRAILING) ======
-                        // Three action icons for quick operations on note
-                        // Layout: Row of 3 compact IconButtons (like, tags, delete)
-                        trailing: SizedBox(
-                          width: 80,
-                          child: Row(
-                            mainAxisAlignment: MainAxisAlignment.end,
+                          ),
+                          subtitle: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
-                              // LIKE/UNLIKE BUTTON
-                              // Heart icon: filled (pink #CE93D8) if liked, outline (grey) if not
-                              // Toggles like status and updates database
-                              IconButton(
-                                icon: Icon(
-                                  note.isLiked ? Icons.favorite : Icons.favorite_border,
-                                  color: note.isLiked ? const Color(0xFFCE93D8) : Colors.grey,
+                              const SizedBox(height: 4),
+                              Text(
+                                note.content,
+                                maxLines: 2,
+                                overflow: TextOverflow.ellipsis,
+                                style: const TextStyle(fontSize: 13),
+                              ),
+                              const SizedBox(height: 4),
+                              if (note.tags.isNotEmpty)
+                                Wrap(
+                                  spacing: 4,
+                                  children: note.tags.split(',').map((tag) {
+                                    final trimmed = tag.trim();
+                                    if (trimmed.isEmpty) return const SizedBox.shrink();
+                                    return Chip(
+                                      label: Text(trimmed),
+                                      visualDensity: VisualDensity.compact,
+                                      backgroundColor: const Color(0xFFE0F2F1),
+                                    );
+                                  }).toList(),
                                 ),
-                                onPressed: () => _toggleLike(note.id, note.isLiked),
-                                iconSize: 20,
-                                constraints: const BoxConstraints(),  // Compact size
-                                padding: EdgeInsets.zero,
-                              ),
-                              const SizedBox(width: 8),
-                              // EDIT TAGS BUTTON
-                              // Label/tag icon (purple) opens dialog to modify tags
-                              // Shows tooltip on long press
-                              IconButton(
-                                icon: const Icon(Icons.label_outline, color: Color(0xFF9575CD)),
-                                onPressed: () => _showEditTagsDialog(note.id, note.tags),
-                                iconSize: 20,
-                                constraints: const BoxConstraints(),  // Compact size
-                                padding: EdgeInsets.zero,
-                                tooltip: 'Edit tags',
-                              ),
-                              const SizedBox(width: 8),
-                              // DELETE BUTTON
-                              // Trash icon (red #EF9A9A) opens confirmation dialog
-                              // Prevents accidental deletion
-                              IconButton(
-                                icon: const Icon(Icons.delete_outline, color: Color(0xFFEF9A9A)),
-                                onPressed: () => _showDeleteConfirmation(note.id),
-                                iconSize: 20,
-                                constraints: const BoxConstraints(),  // Compact size
-                                padding: EdgeInsets.zero,
+                              const SizedBox(height: 4),
+                              Text(
+                                note.dateTime,
+                                style: const TextStyle(fontSize: 11, color: Colors.grey),
                               ),
                             ],
                           ),
-                        ),
-                        // ====== NOTE CARD TAP ======
-                        // Tapping note card navigates to detailed view
-                        // Passes Note object to NoteDetailScreen
-                        // Allows user to view full transcript, edit details, or share
-                        onTap: () {
-                          Navigator.push(
-                            context,
-                            MaterialPageRoute(
-                              builder: (context) => NoteDetailScreen(note: note),
+                          trailing: SizedBox(
+                            width: 90,
+                            child: Row(
+                              mainAxisAlignment: MainAxisAlignment.end,
+                              children: [
+                                IconButton(
+                                  icon: Icon(
+                                    note.isLiked ? Icons.favorite : Icons.favorite_border,
+                                    color: note.isLiked ? const Color(0xFFE91E63) : Colors.grey,
+                                  ),
+                                  onPressed: () => _toggleLike(note.id, note.isLiked),
+                                  iconSize: 20,
+                                  constraints: const BoxConstraints(),
+                                  padding: EdgeInsets.zero,
+                                ),
+                                const SizedBox(width: 6),
+                                IconButton(
+                                  icon: const Icon(Icons.label_outline, color: Color(0xFF00897B)),
+                                  onPressed: () => _showEditTagsDialog(note.id, note.tags),
+                                  iconSize: 20,
+                                  constraints: const BoxConstraints(),
+                                  padding: EdgeInsets.zero,
+                                  tooltip: 'Edit tags',
+                                ),
+                                const SizedBox(width: 6),
+                                IconButton(
+                                  icon: const Icon(Icons.delete_outline, color: Color(0xFFF44336)),
+                                  onPressed: () => _showDeleteConfirmation(note.id),
+                                  iconSize: 20,
+                                  constraints: const BoxConstraints(),
+                                  padding: EdgeInsets.zero,
+                                ),
+                              ],
                             ),
-                          );
-                        },
-                      ),
-                    );
-                  },
+                          ),
+                          onTap: () async {
+                            await Navigator.push(
+                              context,
+                              MaterialPageRoute(
+                                builder: (context) => NoteDetailScreen(note: note),
+                              ),
+                            );
+                            _refreshNotes();
+                          },
+                        ),
+                      );
+                    },
+                  ),
                 );
               },
             ),
